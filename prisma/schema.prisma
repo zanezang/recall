@@ -1,0 +1,15 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Card {
+  id             Int      @id @default(autoincrement())
+  question       String
+  confidence     Int
+  createdAt      DateTime @default(now())
+  lastReviewedAt DateTime @default(now())
+}
