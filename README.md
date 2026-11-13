@@ -7,6 +7,7 @@ Built as a deliberately minimal learning tool: no accounts, distractions, or fea
 ## Highlights
 
 - **Continuous-decay ranking** — cards rise in priority as time passes, while stronger confidence lowers their urgency.
+- **Persistent storage** — cards are saved to SQLite through Next.js API routes, so they survive page refreshes and server restarts.
 - **Focused review flow** — update recall confidence from 1–5 after each review to refresh a card's place in the queue.
 - **Clear, responsive interface** — scan-friendly card hierarchy, visual confidence indicators, mobile layouts, and keyboard-friendly modal controls.
 - **Thoughtful interaction feedback** — immediate confirmation after cards are added, reviewed, or deleted.
@@ -31,6 +32,15 @@ This makes overdue, low-confidence concepts surface sooner while allowing well-k
 - **Next.js 16** and **React 19**
 - **TypeScript**
 - **Prisma** with **SQLite** and `better-sqlite3`
+- **REST API** via Next.js route handlers:
+
+  | Method | Route | Action |
+  | --- | --- | --- |
+  | `GET` | `/api/cards` | List all cards |
+  | `POST` | `/api/cards` | Create a card |
+  | `PATCH` | `/api/cards/:id` | Save a review (confidence + review time) |
+  | `DELETE` | `/api/cards/:id` | Delete a card |
+
 - Responsive CSS with no component-library dependency
 
 ## Running locally
@@ -38,6 +48,7 @@ This makes overdue, low-confidence concepts surface sooner while allowing well-k
 ```bash
 npm install
 cp .env.example .env
+npm run db:migrate   # creates prisma/dev.db and its tables
 npm run db:generate
 npm run dev
 ```
