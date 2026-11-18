@@ -12,4 +12,8 @@ model Card {
   confidence     Int
   createdAt      DateTime @default(now())
   lastReviewedAt DateTime @default(now())
+  /// When the card's priority reaches DUE_THRESHOLD. Null for cards created before this field existed.
+  dueAt          DateTime?
+
+  @@index([dueAt])
 }

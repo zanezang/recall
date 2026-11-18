@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 
 import { isValidConfidence, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confidence';
+import { DUE_THRESHOLD, findDueTime } from '@/lib/dueTime';
 import { prisma } from '@/lib/prisma';
 
 // Routes for a single study card.
@@ -33,7 +34,8 @@ function isRecordNotFound(error: unknown): boolean {
 }
 
 /**
- * Records a review: saves the card's new confidence and marks it as reviewed now.
+ * Records a review: saves the card's new confidence, marks it as reviewed now, and
+ * recomputes when it will next be due.
  *
  * The server sets `lastReviewedAt` itself so every review is timed by one trusted clock,
  * not by whatever clock the client happens to have.
@@ -55,13 +57,29 @@ export async function PATCH(request: Request, context: CardRouteContext) {
     );
   }
 
+  // The due time depends on when the card was created, so that is read first.
+  const existing = await prisma.card.findUnique({
+    where: { id: cardId },
+    select: { createdAt: true },
+  });
+  if (existing === null) {
+    return Response.json({ error: 'Card not found.' }, { status: 404 });
+  }
+
+  const now = new Date();
+  const dueAt = findDueTime(
+    { confidence, createdAt: existing.createdAt.getTime(), lastReviewedAt: now.getTime() },
+    DUE_THRESHOLD,
+  );
+
   try {
     const card = await prisma.card.update({
       where: { id: cardId },
-      data: { confidence, lastReviewedAt: new Date() },
+      data: { confidence, lastReviewedAt: now, dueAt: new Date(dueAt) },
     });
     return Response.json(card);
   } catch (error) {
+    // The card can still be deleted between the read above and this update.
     if (isRecordNotFound(error)) {
       return Response.json({ error: 'Card not found.' }, { status: 404 });
     }

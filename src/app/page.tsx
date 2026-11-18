@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 
 import { CONFIDENCE_LEVELS, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confidence';
+import { priorityAt } from '@/lib/dueTime';
 
 /** A card as the page uses it. Timestamps are epoch milliseconds so they can be subtracted. */
 type Card = {
@@ -44,9 +45,6 @@ const QUEUE_SIZE = 5;
 /** How long a toast stays on screen, in milliseconds. */
 const TOAST_DURATION_MS = 3500;
 
-/** Weight on time since the last review in the priority formula. 1 leaves it unscaled. */
-const ELAPSED_TIME_WEIGHT = 1;
-
 /** Converts a card from the API's shape to the page's shape by parsing its timestamps. */
 function toCard(apiCard: ApiCard): Card {
   return {
@@ -56,24 +54,9 @@ function toCard(apiCard: ApiCard): Card {
   };
 }
 
-/**
- * Scores how urgently a card needs review. Higher scores are studied first.
- *
- *   priority = (secondsSinceReview × ELAPSED_TIME_WEIGHT) / (confidence × ln(ageInSeconds + e))
- *
- * Priority rises with time since the last review and falls with confidence. The log term
- * gradually lowers the score of long-lived cards, and adding e keeps it at least 1, so a
- * brand-new card never divides by zero.
- */
-function calculatePriority(card: Card): number {
-  const now = Date.now();
-  const secondsSinceReview = (now - card.lastReviewedAt) / 1000;
-  const ageInSeconds = (now - card.createdAt) / 1000;
-
-  return (
-    (secondsSinceReview * ELAPSED_TIME_WEIGHT) /
-    (card.confidence * Math.log(ageInSeconds + Math.E))
-  );
+/** Scores how urgently a card needs review right now. Higher scores are studied first. */
+function currentPriority(card: Card): number {
+  return priorityAt(card, Date.now());
 }
 
 /** A row of dots with the first `value` filled in, e.g. ●●●○○ for a confidence of 3. */
@@ -259,7 +242,7 @@ export default function Home() {
   const rankedCards = useMemo(
     () =>
       cards
-        .map((card) => ({ card, priority: calculatePriority(card) }))
+        .map((card) => ({ card, priority: currentPriority(card) }))
         .sort((a, b) => b.priority - a.priority),
     [cards],
   );

@@ -1,4 +1,5 @@
 import { isValidConfidence, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confidence';
+import { DUE_THRESHOLD, findDueTime } from '@/lib/dueTime';
 import { prisma } from '@/lib/prisma';
 
 // Collection routes for study cards.
@@ -21,8 +22,8 @@ export async function GET() {
 /**
  * Creates a card from `{ question, confidence }`.
  *
- * The database assigns `id`, `createdAt`, and `lastReviewedAt`. The created card is returned
- * so the client can use those values instead of guessing them.
+ * The server assigns `id`, `createdAt`, `lastReviewedAt`, and `dueAt`. The created card is
+ * returned so the client can use those values instead of guessing them.
  */
 export async function POST(request: Request) {
   let body: CreateCardBody | null;
@@ -47,8 +48,16 @@ export async function POST(request: Request) {
     );
   }
 
+  // A new card counts as reviewed at creation, so one timestamp serves for both fields
+  // and for computing when the card first becomes due.
+  const now = new Date();
+  const dueAt = findDueTime(
+    { confidence, createdAt: now.getTime(), lastReviewedAt: now.getTime() },
+    DUE_THRESHOLD,
+  );
+
   const card = await prisma.card.create({
-    data: { question, confidence },
+    data: { question, confidence, createdAt: now, lastReviewedAt: now, dueAt: new Date(dueAt) },
   });
   return Response.json(card, { status: 201 });
 }
