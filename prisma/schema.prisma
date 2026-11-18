@@ -12,8 +12,16 @@ model Card {
   confidence     Int
   createdAt      DateTime @default(now())
   lastReviewedAt DateTime @default(now())
-  /// When the card's priority reaches DUE_THRESHOLD. Null for cards created before this field existed.
-  dueAt          DateTime?
+  levels         CardLevel[]
+}
 
-  @@index([dueAt])
+/// The moment a card's priority reaches one threshold level. Each card has one row per level.
+model CardLevel {
+  cardId    Int
+  level     Int
+  crossesAt DateTime
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, level])
+  @@index([level, crossesAt])
 }

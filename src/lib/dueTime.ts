@@ -17,12 +17,6 @@ export type CardTiming = {
 /** Weight on time since the last review in the priority formula. 1 leaves it unscaled. */
 export const ELAPSED_TIME_WEIGHT = 1;
 
-/**
- * The priority at which a card counts as due. At 1000, a new card rated 1 is due about
- * 2.5 hours after review and a new card rated 5 about 15 hours after.
- */
-export const DUE_THRESHOLD = 1000;
-
 /** First step tried when looking for a time at which a card is due, in milliseconds. */
 const INITIAL_SEARCH_STEP_MS = 1000;
 

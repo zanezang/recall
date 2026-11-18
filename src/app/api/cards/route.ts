@@ -1,5 +1,5 @@
 import { isValidConfidence, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confidence';
-import { DUE_THRESHOLD, findDueTime } from '@/lib/dueTime';
+import { computeLevelCrossings } from '@/lib/levels';
 import { prisma } from '@/lib/prisma';
 
 // Collection routes for study cards.
@@ -22,8 +22,9 @@ export async function GET() {
 /**
  * Creates a card from `{ question, confidence }`.
  *
- * The server assigns `id`, `createdAt`, `lastReviewedAt`, and `dueAt`. The created card is
- * returned so the client can use those values instead of guessing them.
+ * The server assigns `id`, `createdAt`, and `lastReviewedAt`, and stores when the card will
+ * cross each priority level. The created card is returned so the client can use those
+ * values instead of guessing them.
  */
 export async function POST(request: Request) {
   let body: CreateCardBody | null;
@@ -49,15 +50,24 @@ export async function POST(request: Request) {
   }
 
   // A new card counts as reviewed at creation, so one timestamp serves for both fields
-  // and for computing when the card first becomes due.
+  // and for computing its level crossings.
   const now = new Date();
-  const dueAt = findDueTime(
-    { confidence, createdAt: now.getTime(), lastReviewedAt: now.getTime() },
-    DUE_THRESHOLD,
-  );
+  const crossings = computeLevelCrossings({
+    confidence: confidence,
+    createdAt: now.getTime(),
+    lastReviewedAt: now.getTime(),
+  });
 
+  // A nested create: the card row and its level rows are written in one transaction, so
+  // the database never holds a card without its levels.
   const card = await prisma.card.create({
-    data: { question, confidence, createdAt: now, lastReviewedAt: now, dueAt: new Date(dueAt) },
+    data: {
+      question: question,
+      confidence: confidence,
+      createdAt: now,
+      lastReviewedAt: now,
+      levels: { create: crossings },
+    },
   });
   return Response.json(card, { status: 201 });
 }

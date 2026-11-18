@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 
 import { isValidConfidence, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confidence';
-import { DUE_THRESHOLD, findDueTime } from '@/lib/dueTime';
+import { computeLevelCrossings } from '@/lib/levels';
 import { prisma } from '@/lib/prisma';
 
 // Routes for a single study card.
@@ -35,7 +35,7 @@ function isRecordNotFound(error: unknown): boolean {
 
 /**
  * Records a review: saves the card's new confidence, marks it as reviewed now, and
- * recomputes when it will next be due.
+ * recomputes when it will cross each priority level.
  *
  * The server sets `lastReviewedAt` itself so every review is timed by one trusted clock,
  * not by whatever clock the client happens to have.
@@ -57,7 +57,7 @@ export async function PATCH(request: Request, context: CardRouteContext) {
     );
   }
 
-  // The due time depends on when the card was created, so that is read first.
+  // The level crossings depend on when the card was created, so that is read first.
   const existing = await prisma.card.findUnique({
     where: { id: cardId },
     select: { createdAt: true },
@@ -67,15 +67,22 @@ export async function PATCH(request: Request, context: CardRouteContext) {
   }
 
   const now = new Date();
-  const dueAt = findDueTime(
-    { confidence, createdAt: existing.createdAt.getTime(), lastReviewedAt: now.getTime() },
-    DUE_THRESHOLD,
-  );
+  const crossings = computeLevelCrossings({
+    confidence: confidence,
+    createdAt: existing.createdAt.getTime(),
+    lastReviewedAt: now.getTime(),
+  });
 
   try {
+    // A nested update: the card's old level rows are deleted and the new ones created in
+    // the same transaction as the card update, so the two can never disagree.
     const card = await prisma.card.update({
       where: { id: cardId },
-      data: { confidence, lastReviewedAt: now, dueAt: new Date(dueAt) },
+      data: {
+        confidence: confidence,
+        lastReviewedAt: now,
+        levels: { deleteMany: {}, create: crossings },
+      },
     });
     return Response.json(card);
   } catch (error) {
