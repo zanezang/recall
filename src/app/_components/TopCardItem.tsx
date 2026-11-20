@@ -21,7 +21,7 @@ export function TopCardItem(props: TopCardItemProps) {
     <article className="card">
       <div className="card-topline">
         <span className="rank">#{props.rank} to study</span>
-        <span className="priority">Priority <strong>{props.priority.toFixed(2)}</strong></span>
+        <span className="priority">Priority <strong>{Math.round(props.priority)}</strong></span>
       </div>
 
       <h3>{card.question}</h3>

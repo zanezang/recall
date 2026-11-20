@@ -3,16 +3,15 @@
 import { useEffect, useState } from 'react';
 
 import { MAX_CONFIDENCE } from '@/lib/confidence';
+import { DEFAULT_TOP_CARDS_COUNT } from '@/lib/topCards/topCardsCount';
 import type { Card } from '@/lib/types';
 
 import { AddCardForm } from './_components/AddCardForm';
 import { ReviewDialog } from './_components/ReviewDialog';
 import { Toast, type ToastMessage } from './_components/Toast';
+import { TopCardControls } from './_components/TopCardControls';
 import { TopCardList } from './_components/TopCardList';
 import { createCard, deleteCard, fetchTopCards, saveReview } from './_lib/cardsApi';
-
-/** How many of the highest-priority cards the page shows. */
-const TOP_CARDS_COUNT = 5;
 
 /** How long a toast stays on screen, in milliseconds. */
 const TOAST_DURATION_MS = 3500;
@@ -29,32 +28,49 @@ export default function Home() {
   const [topCards, setTopCards] = useState<Card[]>([]);
   const [totalCount, setTotalCount] = useState(0);
 
+  // How many top cards to show, typed in the toolbar and applied on Refresh.
+  const [topCardsCount, setTopCardsCount] = useState(DEFAULT_TOP_CARDS_COUNT);
+
+  // True while the top cards are being fetched. Starts true because the page loads them
+  // as soon as it opens.
+  const [isLoading, setIsLoading] = useState(true);
+
+  // The server time the shown cards were ranked at, or null before the first load.
+  const [rankedAtMs, setRankedAtMs] = useState<number | null>(null);
+
+  // Whether the study list is shown. Hiding it only stops drawing it; nothing is fetched.
+  const [isListVisible, setIsListVisible] = useState(true);
+
   // The card open in the review dialog, or null while the dialog is closed.
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
 
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
-  // Load the top cards once, when the page mounts.
-  useEffect(function loadTopCardsOnMount() {
+  // Load the top cards once, when the page opens.
+  useEffect(function loadTopCardsOnPageOpen() {
     // Set during cleanup, so a response that arrives after unmount (or after React's
     // development-only second run of effects) can't overwrite newer state.
     let ignore = false;
 
-    async function loadTopCards() {
+    async function loadFirstTopCards() {
       try {
-        const result = await fetchTopCards(TOP_CARDS_COUNT);
+        const result = await fetchTopCards(DEFAULT_TOP_CARDS_COUNT);
         if (!ignore) {
           setTopCards(result.cards);
           setTotalCount(result.totalCount);
+          setRankedAtMs(result.rankedAtMs);
         }
       } catch {
         if (!ignore) {
           setToast({ message: 'Could not load your cards.', tone: 'neutral' });
         }
       }
+      if (!ignore) {
+        setIsLoading(false);
+      }
     }
 
-    loadTopCards();
+    loadFirstTopCards();
 
     return function cancelLoad() {
       ignore = true;
@@ -75,15 +91,34 @@ export default function Home() {
     setToast({ message: message, tone: tone });
   }
 
-  /** Reloads the top cards after a change, since any change can reorder them. */
-  async function refreshTopCards() {
+  /**
+   * Fetches the top `count` cards and shows them. Used by Refresh and after every add,
+   * review, or delete, since any change can reorder the cards.
+   *
+   * Takes `count` as an argument instead of reading `topCardsCount`, because right after
+   * setTopCardsCount(10) the variable still holds the old value until the next render.
+   */
+  async function loadTopCards(count: number) {
+    setIsLoading(true);
     try {
-      const result = await fetchTopCards(TOP_CARDS_COUNT);
+      const result = await fetchTopCards(count);
       setTopCards(result.cards);
       setTotalCount(result.totalCount);
+      setRankedAtMs(result.rankedAtMs);
     } catch {
-      showToast('Could not refresh your cards.', 'neutral');
+      showToast('Could not load your cards.', 'neutral');
     }
+    setIsLoading(false);
+  }
+
+  /** Remembers the count typed in the toolbar, so later reloads use it too, then loads. */
+  function handleRefresh(count: number) {
+    setTopCardsCount(count);
+    loadTopCards(count);
+  }
+
+  function handleToggleList() {
+    setIsListVisible(!isListVisible);
   }
 
   /** Saves a new card. Returns true if it was saved, so the form can clear itself. */
@@ -100,7 +135,7 @@ export default function Home() {
       return false;
     }
 
-    await refreshTopCards();
+    await loadTopCards(topCardsCount);
     showToast('Card added to your study list.');
     return true;
   }
@@ -114,7 +149,7 @@ export default function Home() {
       return;
     }
 
-    await refreshTopCards();
+    await loadTopCards(topCardsCount);
     setSelectedCard(null);
     showToast(`Review saved — confidence set to ${confidence}/${MAX_CONFIDENCE}.`);
   }
@@ -128,7 +163,7 @@ export default function Home() {
       return;
     }
 
-    await refreshTopCards();
+    await loadTopCards(topCardsCount);
     if (selectedCard?.id === cardId) {
       setSelectedCard(null);
     }
@@ -151,12 +186,23 @@ export default function Home() {
 
       <AddCardForm onAddCard={handleAddCard} />
 
-      <TopCardList
-        topCards={topCards}
-        totalCount={totalCount}
-        onReview={setSelectedCard}
-        onDelete={handleDelete}
+      <TopCardControls
+        count={topCardsCount}
+        isLoading={isLoading}
+        isListVisible={isListVisible}
+        rankedAtMs={rankedAtMs}
+        onRefresh={handleRefresh}
+        onToggleList={handleToggleList}
       />
+
+      {isListVisible && (
+        <TopCardList
+          topCards={topCards}
+          totalCount={totalCount}
+          onReview={setSelectedCard}
+          onDelete={handleDelete}
+        />
+      )}
 
       {toast !== null && <Toast toast={toast} />}
 

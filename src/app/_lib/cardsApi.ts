@@ -13,6 +13,8 @@ import type { Card } from '@/lib/types';
 export type TopCardsResponse = {
   cards: Card[];
   totalCount: number;
+  /** The server time the cards were ranked at, in epoch milliseconds. */
+  rankedAtMs: number;
 };
 
 /** Throws unless the response has a success status (200–299). */

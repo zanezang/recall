@@ -1,11 +1,13 @@
 import { type NextRequest } from 'next/server';
 
-import { DEFAULT_TOP_CARDS_COUNT, getTopCards, MAX_TOP_CARDS_COUNT } from '@/lib/topCards/getTopCards';
+import { getTopCards } from '@/lib/topCards/getTopCards';
+import { DEFAULT_TOP_CARDS_COUNT, MAX_TOP_CARDS_COUNT } from '@/lib/topCards/topCardsCount';
 import { prisma } from '@/lib/prisma';
 
 // The cards to study next.
 //
-//   GET /api/top-cards?k=5   200  { cards: the top k cards, highest priority first, totalCount }
+//   GET /api/top-cards?k=5   200  { cards: the top k cards, highest priority first,
+//                                   totalCount, rankedAtMs: the server time they were ranked at }
 //                            400  if k is not a whole number from 1 to MAX_TOP_CARDS_COUNT
 
 /**
@@ -33,5 +35,6 @@ export async function GET(request: NextRequest) {
   const cards = await getTopCards(nowMs, k);
   const totalCount = await prisma.card.count();
 
-  return Response.json({ cards: cards, totalCount: totalCount }, { status: 200 });
+  // rankedAtMs tells the page which moment the ranking describes.
+  return Response.json({ cards: cards, totalCount: totalCount, rankedAtMs: nowMs }, { status: 200 });
 }

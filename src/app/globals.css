@@ -55,6 +55,14 @@ input[type='range'] { width: 100%; height: 6px; margin: 10px 0 0; accent-color: 
 .primary-button span, .review-button span { margin-left: 4px; }
 .primary-button:hover, .review-button:hover { background: var(--accent-dark); transform: translateY(-1px); }
 
+.top-card-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 20px; color: var(--muted); font-size: 14px; }
+.count-picker { display: flex; align-items: center; gap: 6px; }
+.count-picker input { width: 64px; }
+.top-card-controls input, .top-card-controls button { padding: 7px 10px; border: 1px solid #d9dfe8; border-radius: 9px; background: #fff; color: #44516a; font: inherit; font-weight: 600; }
+.top-card-controls button:hover:not(:disabled) { background: #f5f7fa; }
+.top-card-controls :disabled { opacity: .6; cursor: default; }
+.ranked-at { margin-left: auto; font-size: 13px; }
+
 .study-section { margin-bottom: 0; }
 .section-header { margin-bottom: 17px; }
 .cards { display: grid; gap: 13px; }
