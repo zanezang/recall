@@ -3,21 +3,13 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 
 import { CONFIDENCE_LEVELS, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confidence';
-import { priorityAt } from '@/lib/dueTime';
+import { priorityAt } from '@/lib/priority/priorityMath';
+import type { Card } from '@/lib/types';
 
-/** A card as the page uses it. Timestamps are epoch milliseconds so they can be subtracted. */
-type Card = {
-  id: number;
-  question: string;
-  confidence: number;
-  createdAt: number;
-  lastReviewedAt: number;
-};
-
-/** A card as the API returns it. JSON has no date type, so timestamps arrive as ISO 8601 strings. */
-type ApiCard = Omit<Card, 'createdAt' | 'lastReviewedAt'> & {
-  createdAt: string;
-  lastReviewedAt: string;
+/** The body of GET /api/top-cards. Card times are epoch milliseconds. */
+type TopCardsResponse = {
+  cards: Card[];
+  totalCount: number;
 };
 
 /** A brief status message shown in the corner of the page. */
@@ -39,19 +31,19 @@ const CONFIDENCE_LABELS: Record<number, string> = {
   5: 'Very confident',
 };
 
-/** How many of the highest-priority cards the queue shows. */
-const QUEUE_SIZE = 5;
+/** How many of the highest-priority cards the page shows. */
+const TOP_CARDS_COUNT = 5;
 
 /** How long a toast stays on screen, in milliseconds. */
 const TOAST_DURATION_MS = 3500;
 
-/** Converts a card from the API's shape to the page's shape by parsing its timestamps. */
-function toCard(apiCard: ApiCard): Card {
-  return {
-    ...apiCard,
-    createdAt: new Date(apiCard.createdAt).getTime(),
-    lastReviewedAt: new Date(apiCard.lastReviewedAt).getTime(),
-  };
+/** Asks the server for the highest-priority cards. The server does the ranking. */
+async function fetchTopCards(): Promise<TopCardsResponse> {
+  const response = await fetch(`/api/top-cards?k=${TOP_CARDS_COUNT}`);
+  if (!response.ok) {
+    throw new Error(`GET /api/top-cards failed with status ${response.status}`);
+  }
+  return response.json();
 }
 
 /** Scores how urgently a card needs review right now. Higher scores are studied first. */
@@ -74,12 +66,13 @@ function ConfidenceMeter(props: ConfidenceMeterProps) {
 /**
  * Recall's home page: add study cards, see the most urgent ones, and review or delete them.
  *
- * Cards are stored in the database and reached only through the /api/cards routes. The page
- * keeps a copy in state for rendering and replaces it with the server's response after each
- * change, so the database stays the source of truth.
+ * The server ranks the cards: the page shows what GET /api/top-cards returns and asks again
+ * after every add, review, or delete, so the database stays the source of truth.
  */
 export default function Home() {
-  const [cards, setCards] = useState<Card[]>([]);
+  // The highest-priority cards, highest first, and how many cards exist in total.
+  const [topCards, setTopCards] = useState<Card[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Fields of the "Add a concept" form.
   const [question, setQuestion] = useState('');
@@ -90,22 +83,18 @@ export default function Home() {
 
   const [toast, setToast] = useState<Toast | null>(null);
 
-  // Load the saved cards once, when the page mounts.
-  useEffect(function loadCardsOnMount() {
+  // Load the top cards once, when the page mounts.
+  useEffect(function loadTopCardsOnMount() {
     // Set during cleanup, so a response that arrives after unmount (or after React's
     // development-only second run of effects) can't overwrite newer state.
     let ignore = false;
 
-    async function loadCards() {
+    async function loadTopCards() {
       try {
-        const response = await fetch('/api/cards');
-        if (!response.ok) {
-          throw new Error(`GET /api/cards failed with status ${response.status}`);
-        }
-
-        const apiCards: ApiCard[] = await response.json();
+        const result = await fetchTopCards();
         if (!ignore) {
-          setCards(apiCards.map(toCard));
+          setTopCards(result.cards);
+          setTotalCount(result.totalCount);
         }
       } catch {
         if (!ignore) {
@@ -114,7 +103,7 @@ export default function Home() {
       }
     }
 
-    loadCards();
+    loadTopCards();
 
     return function cancelLoad() {
       ignore = true;
@@ -151,6 +140,17 @@ export default function Home() {
     setToast({ message, tone });
   }
 
+  /** Reloads the top cards after a change, since any change can reorder them. */
+  async function refreshTopCards() {
+    try {
+      const result = await fetchTopCards();
+      setTopCards(result.cards);
+      setTotalCount(result.totalCount);
+    } catch {
+      showToast('Could not refresh your cards.', 'neutral');
+    }
+  }
+
   function handleQuestionChange(event: ChangeEvent<HTMLTextAreaElement>) {
     setQuestion(event.target.value);
   }
@@ -184,15 +184,11 @@ export default function Home() {
       return;
     }
 
-    // Use the server's copy, which carries the id and timestamps the database assigned.
-    const savedCard = toCard(await response.json());
-    setCards((currentCards) => {
-      return [...currentCards, savedCard];
-    });
+    await refreshTopCards();
 
     setQuestion('');
     setConfidence(MIN_CONFIDENCE);
-    showToast('Card added to your study queue.');
+    showToast('Card added to your study list.');
   }
 
   /** Saves a review with the chosen confidence, then closes the review dialog. */
@@ -208,11 +204,7 @@ export default function Home() {
       return;
     }
 
-    // The server stamps lastReviewedAt, so swap in its copy of the card.
-    const reviewedCard = toCard(await response.json());
-    setCards((currentCards) =>
-      currentCards.map((card) => (card.id === cardId ? reviewedCard : card)),
-    );
+    await refreshTopCards();
     setSelectedCard(null);
     showToast(`Review saved — confidence set to ${newConfidence}/${MAX_CONFIDENCE}.`);
   }
@@ -230,42 +222,39 @@ export default function Home() {
       return;
     }
 
-    setCards((currentCards) => currentCards.filter((card) => card.id !== cardId));
+    await refreshTopCards();
     if (selectedCard?.id === cardId) {
       setSelectedCard(null);
     }
-    showToast('Card removed from your queue.', 'neutral');
+    showToast('Card removed from your study list.', 'neutral');
   }
 
-  // Priorities depend on the current time, so they're recomputed only when the cards change.
-  // This keeps the displayed scores steady while the user types in the form.
-  const rankedCards = useMemo(
-    () =>
-      cards
-        .map((card) => ({ card, priority: currentPriority(card) }))
-        .sort((a, b) => b.priority - a.priority),
-    [cards],
+  // The server already ranked the cards; this only computes each score for display.
+  // Priorities depend on the current time, so they're recomputed only when the cards change,
+  // which keeps the displayed scores steady while the user types in the form.
+  const scoredTopCards = useMemo(
+    () => topCards.map((card) => ({ card, priority: currentPriority(card) })),
+    [topCards],
   );
-  const topCards = rankedCards.slice(0, QUEUE_SIZE);
 
   return (
     <main className="container">
       <header className="app-header">
         <div>
-          <p className="eyebrow">Your study queue</p>
+          <p className="eyebrow">Your study list</p>
           <h1>Recall</h1>
           <p className="intro">Continuous-decay spaced repetition for the concepts worth revisiting next.</p>
         </div>
-        <div className="queue-summary" aria-label={`${cards.length} total cards`}>
-          <strong>{cards.length}</strong>
-          <span>{cards.length === 1 ? 'card saved' : 'cards saved'}</span>
+        <div className="card-total" aria-label={`${totalCount} total cards`}>
+          <strong>{totalCount}</strong>
+          <span>{totalCount === 1 ? 'card saved' : 'cards saved'}</span>
         </div>
       </header>
 
       <section className="add-card" aria-labelledby="add-card-title">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Build your queue</p>
+            <p className="eyebrow">Build your study list</p>
             <h2 id="add-card-title">Add a concept</h2>
           </div>
           <span className="hint">Keep it focused and easy to revisit.</span>
@@ -301,7 +290,7 @@ export default function Home() {
           </div>
 
           <button className="primary-button" type="submit">
-            Add to queue <span aria-hidden="true">→</span>
+            Add card <span aria-hidden="true">→</span>
           </button>
         </form>
       </section>
@@ -312,21 +301,21 @@ export default function Home() {
             <p className="eyebrow">Up next</p>
             <h2 id="study-now-title">Study now</h2>
           </div>
-          <span className="card-count">Showing {topCards.length} of {cards.length}</span>
+          <span className="card-count">Showing {topCards.length} of {totalCount}</span>
         </div>
 
         {topCards.length === 0 ? (
           <div className="empty">
             <span className="empty-mark" aria-hidden="true">+</span>
-            <h3>Your queue is ready when you are.</h3>
+            <h3>Your study list is ready when you are.</h3>
             <p>Add a concept above and Recall will surface it as time passes.</p>
           </div>
         ) : (
           <div className="cards">
-            {topCards.map(({ card, priority }, index) => (
+            {scoredTopCards.map(({ card, priority }, index) => (
               <article className="card" key={card.id}>
                 <div className="card-topline">
-                  <span className="rank">#{index + 1} in queue</span>
+                  <span className="rank">#{index + 1} to study</span>
                   <span className="priority">Priority <strong>{priority.toFixed(2)}</strong></span>
                 </div>
 
@@ -389,7 +378,7 @@ export default function Home() {
               ))}
             </div>
 
-            <p className="review-note">Your choice updates this card’s decay rate and returns it to the queue.</p>
+            <p className="review-note">Your choice updates this card’s decay rate and returns it to your study list.</p>
             <button className="cancel-button" onClick={() => setSelectedCard(null)}>Not now</button>
           </div>
         </div>

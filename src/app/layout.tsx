@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Recall — Study what matters next",
-  description: "A focused continuous-decay spaced repetition study queue.",
+  description: "A focused spaced-repetition study list with continuous-decay priority.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

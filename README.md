@@ -1,17 +1,17 @@
 # Recall
 
-**Recall** is a focused spaced-repetition study queue that helps learners revisit concepts at the right time. It uses a continuous-decay priority model to rank the concepts that are most useful to study next.
+**Recall** is a focused spaced-repetition study tool that helps learners revisit concepts at the right time. It uses a continuous-decay priority model to rank the concepts that are most useful to study next.
 
-Built as a deliberately minimal learning tool: no accounts, distractions, or feature bloat—just a clear queue for active recall.
+Built as a deliberately minimal learning tool: no accounts, distractions, or feature bloat—just a clear list of what to study next.
 
 ## Highlights
 
 - **Continuous-decay ranking** — cards rise in priority as time passes, while stronger confidence lowers their urgency.
 - **Persistent storage** — cards are saved to SQLite through Next.js API routes, so they survive page refreshes and server restarts.
-- **Focused review flow** — update recall confidence from 1–5 after each review to refresh a card's place in the queue.
+- **Focused review flow** — update recall confidence from 1–5 after each review to refresh its place in the study list.
 - **Clear, responsive interface** — scan-friendly card hierarchy, visual confidence indicators, mobile layouts, and keyboard-friendly modal controls.
 - **Thoughtful interaction feedback** — immediate confirmation after cards are added, reviewed, or deleted.
-- **Stable score display** — visible priority scores remain fixed while entering a new card and refresh only after a study-queue action.
+- **Stable score display** — visible priority scores remain fixed while entering a new card and refresh only after a study action.
 
 ## Priority model
 

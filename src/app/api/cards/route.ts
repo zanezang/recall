@@ -1,5 +1,5 @@
 import { isValidConfidence, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confidence';
-import { computeLevelCrossings } from '@/lib/levels';
+import { computeLevelTimes } from '@/lib/priority/levels';
 import { prisma } from '@/lib/prisma';
 
 // Collection routes for study cards.
@@ -50,9 +50,9 @@ export async function POST(request: Request) {
   }
 
   // A new card counts as reviewed at creation, so one timestamp serves for both fields
-  // and for computing its level crossings.
+  // and for computing its level cross times.
   const now = new Date();
-  const crossings = computeLevelCrossings({
+  const levelTimes = computeLevelTimes({
     confidence: confidence,
     createdAt: now.getTime(),
     lastReviewedAt: now.getTime(),
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       confidence: confidence,
       createdAt: now,
       lastReviewedAt: now,
-      levels: { create: crossings },
+      levelTimes: { create: levelTimes },
     },
   });
   return Response.json(card, { status: 201 });

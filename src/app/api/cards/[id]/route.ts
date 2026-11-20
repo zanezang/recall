@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 
 import { isValidConfidence, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confidence';
-import { computeLevelCrossings } from '@/lib/levels';
+import { computeLevelTimes } from '@/lib/priority/levels';
 import { prisma } from '@/lib/prisma';
 
 // Routes for a single study card.
@@ -57,7 +57,7 @@ export async function PATCH(request: Request, context: CardRouteContext) {
     );
   }
 
-  // The level crossings depend on when the card was created, so that is read first.
+  // The level cross times depend on when the card was created, so that is read first.
   const existing = await prisma.card.findUnique({
     where: { id: cardId },
     select: { createdAt: true },
@@ -67,7 +67,7 @@ export async function PATCH(request: Request, context: CardRouteContext) {
   }
 
   const now = new Date();
-  const crossings = computeLevelCrossings({
+  const levelTimes = computeLevelTimes({
     confidence: confidence,
     createdAt: existing.createdAt.getTime(),
     lastReviewedAt: now.getTime(),
@@ -81,7 +81,7 @@ export async function PATCH(request: Request, context: CardRouteContext) {
       data: {
         confidence: confidence,
         lastReviewedAt: now,
-        levels: { deleteMany: {}, create: crossings },
+        levelTimes: { deleteMany: {}, create: levelTimes },
       },
     });
     return Response.json(card);

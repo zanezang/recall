@@ -1,23 +1,18 @@
 /**
- * Card priority and due-time calculations, shared by the page and the API.
+ * Card priority and crossed-time calculations, shared by the page and the API.
  *
  * A card's priority rises continuously from 0 at its last review. Because it only ever
  * rises, the moment it reaches a given threshold can be computed once, at review time,
- * and stored. "Is this card due?" then becomes a timestamp comparison instead of a
+ * and stored. "Is this card above that score?" then becomes a timestamp comparison instead of a
  * formula evaluated on every card.
  */
 
-/** The fields that determine a card's priority. Times are milliseconds since the Unix epoch. */
-export type CardTiming = {
-  confidence: number;
-  createdAt: number;
-  lastReviewedAt: number;
-};
+import type { PriorityFactors } from '../types.ts';
 
 /** Weight on time since the last review in the priority formula. 1 leaves it unscaled. */
 export const ELAPSED_TIME_WEIGHT = 1;
 
-/** First step tried when looking for a time at which a card is due, in milliseconds. */
+/** First step tried when looking for the time a card crosses a threshold, in milliseconds. */
 const INITIAL_SEARCH_STEP_MS = 1000;
 
 /**
@@ -29,7 +24,7 @@ const INITIAL_SEARCH_STEP_MS = 1000;
  * gradually lowers the score of long-lived cards, and adding e keeps it at least 1, so a
  * brand-new card never divides by zero.
  */
-export function priorityAt(card: CardTiming, timeMs: number): number {
+export function priorityAt(card: PriorityFactors, timeMs: number): number {
   const secondsSinceReview = (timeMs - card.lastReviewedAt) / 1000;
   const ageInSeconds = (timeMs - card.createdAt) / 1000;
 
@@ -48,9 +43,9 @@ export function priorityAt(card: CardTiming, timeMs: number): number {
  * is strictly increasing between reviews, and it terminates because priority grows
  * without bound.
  *
- * Runs in O(log d) evaluations of the formula, where d is the time until the card is due.
+ * Runs in O(log d) evaluations of the formula, where d is the time until the card crosses.
  */
-export function findDueTime(card: CardTiming, threshold: number): number {
+export function findCrossTime(card: PriorityFactors, threshold: number): number {
   // A threshold of 0 or less is already reached at the review time, and an infinite or
   // non-numeric threshold is never reached, so the search below would not terminate.
   if (!Number.isFinite(threshold) || threshold <= 0) {
@@ -59,33 +54,33 @@ export function findDueTime(card: CardTiming, threshold: number): number {
 
   // Phase 1: find two times that bracket the answer.
   //
-  // `notDue` is a time at which priority is below the threshold. It starts at the last
-  // review, where priority is 0. `due` is a later candidate time. While the candidate is
-  // still below the threshold, it becomes the new `notDue` and the next candidate is
+  // `notCrossed` is a time at which priority is below the threshold. It starts at the last
+  // review, where priority is 0. `crossed` is a later candidate time. While the candidate is
+  // still below the threshold, it becomes the new `notCrossed` and the next candidate is
   // placed twice as far ahead, so the gap grows exponentially.
-  let notDue = card.lastReviewedAt;
+  let notCrossed = card.lastReviewedAt;
   let step = INITIAL_SEARCH_STEP_MS;
-  let due = notDue + step;
-  while (priorityAt(card, due) < threshold) {
-    notDue = due;
+  let crossed = notCrossed + step;
+  while (priorityAt(card, crossed) < threshold) {
+    notCrossed = crossed;
     step = step * 2;
-    due = notDue + step;
+    crossed = notCrossed + step;
   }
 
   // Phase 2: binary search between the two times.
   //
-  // Invariant: priority(notDue) < threshold <= priority(due).
+  // Invariant: priority(notCrossed) < threshold <= priority(crossed).
   // Each pass tests the midpoint and moves one of the two times onto it, which halves
-  // the gap and keeps the invariant. When the times are one millisecond apart, `due` is
+  // the gap and keeps the invariant. When the times are one millisecond apart, `crossed` is
   // the first millisecond at which the threshold is reached.
-  while (due - notDue > 1) {
-    const middle = notDue + Math.floor((due - notDue) / 2);
+  while (crossed - notCrossed > 1) {
+    const middle = notCrossed + Math.floor((crossed - notCrossed) / 2);
     if (priorityAt(card, middle) < threshold) {
-      notDue = middle;
+      notCrossed = middle;
     } else {
-      due = middle;
+      crossed = middle;
     }
   }
 
-  return due;
+  return crossed;
 }

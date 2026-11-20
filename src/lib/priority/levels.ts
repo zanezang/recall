@@ -1,12 +1,13 @@
-import { findDueTime, type CardTiming } from './dueTime.ts';
+import { findCrossTime } from './priorityMath.ts';
+import type { PriorityFactors, LevelTime } from '../types.ts';
 
 /**
- * Threshold levels and queue-size limits.
+ * Threshold levels.
  *
  * A level is a fixed priority score. For every card, the moment its priority crosses each
- * level is stored in the CardLevel table. Because priority only rises between reviews, a
+ * level is stored in the CardLevelTime table. Because priority only rises between reviews, a
  * card is above a level exactly when that stored moment has passed, so the levels act as
- * an indexed pre-filter for the study queue.
+ * an indexed pre-filter when finding the top cards.
  */
 
 /** The lowest level. A new card rated 1 reaches it about 2 minutes after review. */
@@ -27,27 +28,15 @@ for (let level = 0; level < LEVEL_COUNT; level++) {
   LEVEL_SCORES.push(LOWEST_LEVEL_SCORE * Math.pow(LEVEL_RATIO, level));
 }
 
-/** How many cards the study queue returns when the request does not say. */
-export const DEFAULT_QUEUE_SIZE = 5;
-
-/** The largest queue size a request may ask for. */
-export const MAX_QUEUE_SIZE = 100;
-
-/** One row of the CardLevel table, before it is saved. */
-export type LevelCrossing = {
-  level: number;
-  crossesAt: Date;
-};
-
 /**
  * Computes when the card's priority will cross each level, from its timing at the moment
  * of its latest review. Called whenever a card is created or reviewed.
  */
-export function computeLevelCrossings(card: CardTiming): LevelCrossing[] {
-  const crossings: LevelCrossing[] = [];
+export function computeLevelTimes(card: PriorityFactors): LevelTime[] {
+  const levelTimes: LevelTime[] = [];
   for (let level = 0; level < LEVEL_SCORES.length; level++) {
-    const crossesAtMs = findDueTime(card, LEVEL_SCORES[level]);
-    crossings.push({ level: level, crossesAt: new Date(crossesAtMs) });
+    const crossesAtMs = findCrossTime(card, LEVEL_SCORES[level]);
+    levelTimes.push({ level: level, crossesAt: new Date(crossesAtMs) });
   }
-  return crossings;
+  return levelTimes;
 }

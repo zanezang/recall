@@ -7,21 +7,21 @@ datasource db {
 }
 
 model Card {
-  id             Int      @id @default(autoincrement())
+  id             Int             @id @default(autoincrement())
   question       String
   confidence     Int
-  createdAt      DateTime @default(now())
-  lastReviewedAt DateTime @default(now())
-  levels         CardLevel[]
+  createdAt      DateTime        @default(now())
+  lastReviewedAt DateTime        @default(now())
+  levelTimes     CardLevelTime[]
 }
 
 /// The moment a card's priority reaches one threshold level. Each card has one row per level.
-model CardLevel {
+model CardLevelTime {
   cardId    Int
   level     Int
   crossesAt DateTime
   card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
-  @@id([cardId, level])
+  @@id([cardId, level]) // This is unique for each CardLevelTime
   @@index([level, crossesAt])
 }
