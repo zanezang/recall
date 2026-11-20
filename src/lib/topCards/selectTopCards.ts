@@ -1,3 +1,4 @@
+import { MinHeap } from '../minHeap.ts';
 import { priorityAt } from '../priority/priorityMath.ts';
 import type { Card } from '../types.ts';
 
@@ -13,6 +14,11 @@ type ScoredCard = {
   priority: number;
 };
 
+/** Orders scored cards by priority, lowest first, so the heap's root is the lowest kept. */
+function compareByPriority(a: ScoredCard, b: ScoredCard): number {
+  return a.priority - b.priority;
+}
+
 /**
  * Returns the `k` candidates with the highest priority at `nowMs`, highest first.
  * Returns all of them, still ranked, when there are fewer than `k`.
@@ -20,24 +26,38 @@ type ScoredCard = {
  * `nowMs` is read once per request and passed in, so every card is scored at the same
  * instant as the level probe that selected it.
  *
- * Sorts every candidate: O(m log m) for m candidates. A min-heap of size k would make
- * this O(m log k).
+ * Keeps the best k seen so far in a min-heap, whose root is the weakest of them, so each
+ * new candidate only has to beat the root. O(m log k) for m candidates, instead of
+ * O(m log m) for sorting them all.
  */
-export function selectTopCards(candidates: Card[], nowMs: number, k: number): Card[] {
-  // Score each candidate once.
-  const scoredCards: ScoredCard[] = [];
-  for (const card of candidates) {
-    scoredCards.push({ card: card, priority: priorityAt(card, nowMs) });
+export function selectTopCards(candidateCards: Card[], nowMs: number, k: number): Card[] {
+  // Score the first k candidates and build the heap from them in O(k).
+  const firstKScoredCards: ScoredCard[] = [];
+  for (let index = 0; index < k && index < candidateCards.length; index++) {
+    const card = candidateCards[index];
+    firstKScoredCards.push({ card: card, priority: priorityAt(card, nowMs) });
+  }
+  const heap = new MinHeap<ScoredCard>(compareByPriority, firstKScoredCards);
+
+  // Each remaining candidate replaces the root if it beats the lowest card kept so far.
+  for (let index = k; index < candidateCards.length; index++) {
+    const card = candidateCards[index];
+    const priority = priorityAt(card, nowMs);
+    const lowestKept = heap.peek();
+    if (lowestKept !== undefined && priority > lowestKept.priority) {
+      heap.removeRoot();
+      heap.add({ card: card, priority: priority });
+    }
   }
 
-  // Highest priority first. The comparator returns a negative number when `a` should
-  // come before `b`, so `b - a` orders from largest to smallest.
-  scoredCards.sort((a, b) => b.priority - a.priority);
-
-  // Keep the first k. If there are fewer than k, the loop stops at the end of the array.
+  // Removing the roots gives lowest first, so reverse for highest first.
   const topCards: Card[] = [];
-  for (let index = 0; index < k && index < scoredCards.length; index++) {
-    topCards.push(scoredCards[index].card);
+  while (heap.size() > 0) {
+    const scoredCard = heap.removeRoot();
+    if (scoredCard !== undefined) {
+      topCards.push(scoredCard.card);
+    }
   }
+  topCards.reverse();
   return topCards;
 }
