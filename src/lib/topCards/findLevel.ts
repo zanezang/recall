@@ -1,4 +1,4 @@
-import { LEVEL_SCORES } from '../priority/levels.ts';
+import { LEVEL_SCORES } from '../priority/thresholdLevels.ts';
 import { prisma } from '../prisma.ts';
 
 /**

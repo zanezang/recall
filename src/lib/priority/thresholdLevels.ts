@@ -29,8 +29,8 @@ for (let level = 0; level < LEVEL_COUNT; level++) {
 }
 
 /**
- * Computes when the card's priority will cross each level, from its timing at the moment
- * of its latest review. Called whenever a card is created or reviewed.
+ * Computes when the card's priority will cross each level, from its priority factors as of
+ * its latest review. Called whenever a card is created or reviewed.
  */
 export function computeLevelTimes(card: PriorityFactors): LevelTime[] {
   const levelTimes: LevelTime[] = [];

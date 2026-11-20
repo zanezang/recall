@@ -4,7 +4,7 @@
  *
  * Run with:  node --env-file=.env scripts/backfill-levels.ts
  */
-import { computeLevelTimes } from '../src/lib/priority/levels.ts';
+import { computeLevelTimes } from '../src/lib/priority/thresholdLevels.ts';
 import { prisma } from '../src/lib/prisma.ts';
 
 const cards = await prisma.card.findMany();

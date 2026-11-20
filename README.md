@@ -27,6 +27,16 @@ priority = elapsedTime / (confidence × ln(age + e))
 
 This makes overdue, low-confidence concepts surface sooner while allowing well-known concepts to recede naturally.
 
+## Finding the top cards
+
+Priority only rises between reviews, so the moment a card reaches a given score can be computed once, when the card is created or reviewed, and stored. Recall stores that moment for 15 fixed score levels (20, 40, 80, …) in an indexed table, then answers "which k cards should I study now?" in three steps:
+
+1. **Find the level:** the highest level that at least k cards have already crossed, using the `(level, crossesAt)` index.
+2. **Load the candidates:** only the cards above that level.
+3. **Select the top k:** score each candidate once and keep the best k in a min-heap of size k, O(m log k).
+
+A randomized test checks the result against scoring and sorting every card.
+
 ## Tech stack
 
 - **Next.js 16** and **React 19**
@@ -36,6 +46,7 @@ This makes overdue, low-confidence concepts surface sooner while allowing well-k
 
   | Method | Route | Action |
   | --- | --- | --- |
+  | `GET` | `/api/top-cards?k=5` | The k highest-priority cards, plus the total card count |
   | `GET` | `/api/cards` | List all cards |
   | `POST` | `/api/cards` | Create a card |
   | `PATCH` | `/api/cards/:id` | Save a review (confidence + review time) |
@@ -58,6 +69,7 @@ Then open [http://localhost:3000](http://localhost:3000).
 ## Quality
 
 ```bash
+npm test
 npm run lint
 npm run typecheck
 npm run build

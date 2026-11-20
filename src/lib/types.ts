@@ -3,7 +3,7 @@
  * Type-only, with no runtime code, so both server code and the page can import it.
  */
 
-/** The inputs to the priority formula. Times are milliseconds since the Unix epoch. */
+/** The factors the priority formula depends on. Times are milliseconds since the Unix epoch. */
 export type PriorityFactors = {
   confidence: number;
   createdAt: number;
@@ -17,10 +17,9 @@ export type LevelTime = {
 };
 
 /**
- * A card as the app uses it outside the database: its id, its question, and the inputs to
- * the priority formula, with times as milliseconds so they can be subtracted. The `&` adds
- * these fields to PriorityInputs, so a card can be passed anywhere PriorityInputs are
- * expected.
+ * A card as the app uses it outside the database: its id, its question, and its priority
+ * factors, with times as milliseconds so they can be subtracted. The `&` adds these fields
+ * to PriorityFactors, so a card can be passed anywhere PriorityFactors are expected.
  */
 export type Card = PriorityFactors & {
   id: number;

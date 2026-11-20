@@ -1,5 +1,5 @@
 import { isValidConfidence, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confidence';
-import { computeLevelTimes } from '@/lib/priority/levels';
+import { computeLevelTimes } from '@/lib/priority/thresholdLevels';
 import { prisma } from '@/lib/prisma';
 
 // Routes for the collection of study cards. Creating a card belongs here, not under

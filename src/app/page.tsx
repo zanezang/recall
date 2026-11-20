@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 
-import { CONFIDENCE_LEVELS, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confidence';
+import { CONFIDENCE_VALUES, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confidence';
 import { priorityAt } from '@/lib/priority/priorityMath';
 import type { Card } from '@/lib/types';
 
@@ -22,7 +22,7 @@ type ConfidenceMeterProps = {
   value: number;
 };
 
-/** Display name for each confidence level. */
+/** Display name for each confidence value. */
 const CONFIDENCE_LABELS: Record<number, string> = {
   1: 'Starting out',
   2: 'Somewhat unsure',
@@ -55,9 +55,9 @@ function currentPriority(card: Card): number {
 function ConfidenceMeter(props: ConfidenceMeterProps) {
   return (
     <span className="confidence-meter" aria-label={`${props.value} out of ${MAX_CONFIDENCE} confidence`}>
-      {CONFIDENCE_LEVELS.map((level) => {
-        const isFilled = level <= props.value;
-        return <span key={level} className={isFilled ? 'is-filled' : ''} />;
+      {CONFIDENCE_VALUES.map((confidenceValue) => {
+        const isFilled = confidenceValue <= props.value;
+        return <span key={confidenceValue} className={isFilled ? 'is-filled' : ''} />;
       })}
     </span>
   );
@@ -370,10 +370,10 @@ export default function Home() {
             <p className="modal-prompt">How well did that come back to you?</p>
 
             <div className="confidence-buttons" aria-label="Choose your confidence">
-              {CONFIDENCE_LEVELS.map((level) => (
-                <button key={level} onClick={() => reviewCard(selectedCard.id, level)}>
-                  <strong>{level}</strong>
-                  <span>{CONFIDENCE_LABELS[level]}</span>
+              {CONFIDENCE_VALUES.map((confidenceValue) => (
+                <button key={confidenceValue} onClick={() => reviewCard(selectedCard.id, confidenceValue)}>
+                  <strong>{confidenceValue}</strong>
+                  <span>{CONFIDENCE_LABELS[confidenceValue]}</span>
                 </button>
               ))}
             </div>

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 
-import { computeLevelTimes } from '../../src/lib/priority/levels.ts';
+import { computeLevelTimes } from '../../src/lib/priority/thresholdLevels.ts';
 import { priorityAt } from '../../src/lib/priority/priorityMath.ts';
 import type { Card } from '../../src/lib/types.ts';
 

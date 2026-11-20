@@ -6,7 +6,7 @@ import type { Card } from '../types.ts';
  * Server-only, because it uses the Prisma client.
  */
 
-/** The fields returned for each card: the id, the question to show, and the priority inputs. */
+/** The fields returned for each card: the id, the question to show, and the priority factors. */
 const CANDIDATE_FIELDS = {
   id: true,
   question: true,

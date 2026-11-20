@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 
 import { isValidConfidence, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confidence';
-import { computeLevelTimes } from '@/lib/priority/levels';
+import { computeLevelTimes } from '@/lib/priority/thresholdLevels';
 import { prisma } from '@/lib/prisma';
 
 // Routes for a single study card. The [id] folder name makes Next.js pass the URL segment

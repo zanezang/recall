@@ -1,5 +1,5 @@
 /**
- * Card priority and crossed-time calculations, shared by the page and the API.
+ * Card priority and cross-time calculations, shared by the page and the API.
  *
  * A card's priority rises continuously from 0 at its last review. Because it only ever
  * rises, the moment it reaches a given threshold can be computed once, at review time,

@@ -11,7 +11,7 @@ const THRESHOLD = 1000;
 /** A fixed reference time so the tests do not depend on the clock. */
 const START = Date.UTC(2026, 0, 1);
 
-/** Cards covering every confidence level, both newly created and long-lived. */
+/** Cards covering every confidence value, both newly created and long-lived. */
 const CARDS: PriorityFactors[] = [];
 for (let confidence = 1; confidence <= 5; confidence++) {
   // Created and reviewed at the same moment.
