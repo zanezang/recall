@@ -11,6 +11,15 @@ export const CONFIDENCE_VALUES = [1, 2, 3, 4, 5];
 export const MIN_CONFIDENCE = CONFIDENCE_VALUES[0];
 export const MAX_CONFIDENCE = CONFIDENCE_VALUES[CONFIDENCE_VALUES.length - 1];
 
+/** Display name for each confidence value. */
+export const CONFIDENCE_LABELS: Record<number, string> = {
+  1: 'Starting out',
+  2: 'Somewhat unsure',
+  3: 'Getting there',
+  4: 'Confident',
+  5: 'Very confident',
+};
+
 /**
  * Returns true if `value` is one of the allowed confidence values.
  *
