@@ -2,7 +2,8 @@ import { isValidConfidence, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confide
 import { computeLevelTimes } from '@/lib/priority/levels';
 import { prisma } from '@/lib/prisma';
 
-// Collection routes for study cards.
+// Routes for the collection of study cards. Creating a card belongs here, not under
+// /api/cards/:id, because a new card has no id until the database assigns one.
 //
 //   GET  /api/cards   200  every card
 //   POST /api/cards   201  the created card   (400 if the input is invalid)
@@ -15,6 +16,7 @@ type CreateCardBody = {
 
 /** Returns every card. */
 export async function GET() {
+  // SELECT * FROM Card
   const cards = await prisma.card.findMany();
   return Response.json(cards, { status: 200 });
 }
@@ -27,6 +29,7 @@ export async function GET() {
  * values instead of guessing them.
  */
 export async function POST(request: Request) {
+  // Input: the JSON body ({ "question": "...", "confidence": 3 }).
   let body: CreateCardBody | null;
   try {
     body = await request.json();
@@ -49,8 +52,8 @@ export async function POST(request: Request) {
     );
   }
 
-  // A new card counts as reviewed at creation, so one timestamp serves for both fields
-  // and for computing its level cross times.
+  // A new card counts as reviewed at creation, so one timestamp serves for both fields.
+  // Then compute its cross time for every level. Pure math, no database.
   const now = new Date();
   const levelTimes = computeLevelTimes({
     confidence: confidence,
@@ -58,16 +61,19 @@ export async function POST(request: Request) {
     lastReviewedAt: now.getTime(),
   });
 
-  // A nested create: the card row and its level rows are written in one transaction, so
-  // the database never holds a card without its levels.
+  // One transaction writes both tables, so a card never exists without its level rows:
+  //   INSERT INTO Card (question, confidence, createdAt, lastReviewedAt)   → id assigned
+  //   INSERT the level rows, with cardId filled in by Prisma from that new id
   const card = await prisma.card.create({
     data: {
-      question: question,
-      confidence: confidence,
-      createdAt: now,
-      lastReviewedAt: now,
-      levelTimes: { create: levelTimes },
+      question: question, // Card table
+      confidence: confidence, // Card table
+      createdAt: now, // Card table
+      lastReviewedAt: now, // Card table
+      levelTimes: { create: levelTimes }, // CardLevelTime table, through the relation field
     },
   });
+
+  // 201 Created: success, and the response holds the new card.
   return Response.json(card, { status: 201 });
 }

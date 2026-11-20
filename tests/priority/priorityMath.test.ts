@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { findCrossTime, priorityAt } from './priorityMath.ts';
-import type { PriorityFactors } from '../types.ts';
+import { findCrossTime, priorityAt } from '../../src/lib/priority/priorityMath.ts';
+import type { PriorityFactors } from '../../src/lib/types.ts';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;

@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 
-import { computeLevelTimes } from '../priority/levels.ts';
-import { priorityAt } from '../priority/priorityMath.ts';
-import type { Card } from '../types.ts';
+import { computeLevelTimes } from '../../src/lib/priority/levels.ts';
+import { priorityAt } from '../../src/lib/priority/priorityMath.ts';
+import type { Card } from '../../src/lib/types.ts';
 
 /**
  * Checks the whole top-cards pipeline against brute force: on a throwaway database of
@@ -70,8 +70,8 @@ before(async () => {
     stdio: 'ignore',
   });
 
-  const prismaModule = await import('../prisma.ts');
-  const topCardsModule = await import('./getTopCards.ts');
+  const prismaModule = await import('../../src/lib/prisma.ts');
+  const topCardsModule = await import('../../src/lib/topCards/getTopCards.ts');
   getTopCards = topCardsModule.getTopCards;
   disconnect = () => prismaModule.prisma.$disconnect();
 

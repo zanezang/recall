@@ -4,7 +4,8 @@ import { isValidConfidence, MAX_CONFIDENCE, MIN_CONFIDENCE } from '@/lib/confide
 import { computeLevelTimes } from '@/lib/priority/levels';
 import { prisma } from '@/lib/prisma';
 
-// Routes for a single study card.
+// Routes for a single study card. The [id] folder name makes Next.js pass the URL segment
+// as `params.id`, so /api/cards/7 gives id "7".
 //
 //   PATCH  /api/cards/:id   200  the reviewed card   (400 invalid input, 404 no such card)
 //   DELETE /api/cards/:id   204  no body             (400 invalid id,    404 no such card)
@@ -19,7 +20,7 @@ type ReviewCardBody = {
   confidence?: unknown;
 };
 
-/** Parses the `:id` URL segment. Returns null unless it is a positive integer. */
+/** Parses the `:id` URL segment, which is always a string. Returns null unless it is a positive integer. */
 function parseCardId(rawId: string): number | null {
   const id = Number(rawId);
   if (Number.isInteger(id) && id > 0) {
@@ -41,13 +42,15 @@ function isRecordNotFound(error: unknown): boolean {
  * not by whatever clock the client happens to have.
  */
 export async function PATCH(request: Request, context: CardRouteContext) {
+  // Input 1: the card id, from the URL (/api/cards/7).
   const params = await context.params;
   const cardId = parseCardId(params.id);
   if (cardId === null) {
     return Response.json({ error: 'Card id must be a positive integer.' }, { status: 400 });
   }
 
-  // Malformed JSON is treated as a missing field and rejected by the check below.
+  // Input 2: the new confidence, from the JSON body ({ "confidence": 3 }).
+  // Malformed JSON becomes null and is rejected by the check below.
   const body: ReviewCardBody | null = await request.json().catch(() => null);
   const confidence = body?.confidence;
   if (!isValidConfidence(confidence)) {
@@ -57,31 +60,38 @@ export async function PATCH(request: Request, context: CardRouteContext) {
     );
   }
 
-  // The level cross times depend on when the card was created, so that is read first.
-  const existing = await prisma.card.findUnique({
+  // Read the card's creation time: the priority formula depends on the card's age.
+  const oldCard = await prisma.card.findUnique({
     where: { id: cardId },
     select: { createdAt: true },
   });
-  if (existing === null) {
+  if (oldCard === null) {
     return Response.json({ error: 'Card not found.' }, { status: 404 });
   }
 
+  // Compute the new cross time for every level. Pure math, no database.
   const now = new Date();
   const levelTimes = computeLevelTimes({
     confidence: confidence,
-    createdAt: existing.createdAt.getTime(),
+    createdAt: oldCard.createdAt.getTime(),
     lastReviewedAt: now.getTime(),
   });
 
   try {
-    // A nested update: the card's old level rows are deleted and the new ones created in
-    // the same transaction as the card update, so the two can never disagree.
+    // One transaction updates both tables, so they can never disagree:
+    //   UPDATE Card SET confidence, lastReviewedAt WHERE id = cardId
+    //   DELETE FROM CardLevelTime WHERE cardId = cardId     (finds the rows by the (cardId, level) key)
+    //   INSERT the new level rows, with cardId filled in by Prisma
     const card = await prisma.card.update({
       where: { id: cardId },
       data: {
-        confidence: confidence,
-        lastReviewedAt: now,
-        levelTimes: { deleteMany: {}, create: levelTimes },
+        confidence: confidence, // Card table
+        lastReviewedAt: now, // Card table
+        levelTimes: {
+          // CardLevelTime table, reached through the relation field
+          deleteMany: {}, // every row of this card ({} adds no extra filter)
+          create: levelTimes, // the new rows, one per level
+        },
       },
     });
     return Response.json(card);
@@ -95,15 +105,20 @@ export async function PATCH(request: Request, context: CardRouteContext) {
   }
 }
 
-/** Deletes a card. */
-export async function DELETE(_request: Request, { params }: CardRouteContext) {
-  const { id } = await params;
-  const cardId = parseCardId(id);
+/**
+ * Deletes a card. Its level rows are deleted by the database itself, through the
+ * `onDelete: Cascade` rule on CardLevelTime's foreign key.
+ */
+export async function DELETE(_request: Request, context: CardRouteContext) {
+  // The card id, from the URL (/api/cards/7).
+  const params = await context.params;
+  const cardId = parseCardId(params.id);
   if (cardId === null) {
     return Response.json({ error: 'Card id must be a positive integer.' }, { status: 400 });
   }
 
   try {
+    // DELETE FROM Card WHERE id = cardId; the cascade removes its CardLevelTime rows.
     await prisma.card.delete({ where: { id: cardId } });
   } catch (error) {
     if (isRecordNotFound(error)) {
@@ -112,5 +127,6 @@ export async function DELETE(_request: Request, { params }: CardRouteContext) {
     throw error;
   }
 
+  // 204 No Content: success, with nothing to send back.
   return new Response(null, { status: 204 });
 }
